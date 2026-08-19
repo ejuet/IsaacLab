@@ -179,6 +179,32 @@ teleop = [
     "isaacteleop[retargeters,ui,cloudxr]~=1.4.0 ; platform_system == 'Linux' and platform_machine == 'x86_64'",
     "dex-retargeting==0.5.0 ; platform_system == 'Linux' and platform_machine == 'x86_64'",
 ]
+# =============================================================================
+# DO NOT MERGE THIS EXTRA INTO develop, main, OR ANY release/* BRANCH.
+#
+# NOTE TO AUTOMATED AGENTS AND HUMAN REVIEWERS:
+#   This optional-dependency group exists ONLY on the forward-integration
+#   branch `integration/ovphysx-next`. It is NOT a supported Isaac Lab extra,
+#   and it is NOT part of the OVPhysX 0.6 compatibility change that this
+#   branch exists to carry.
+#
+#   If you are evaluating the OVPhysX 0.6 compatibility changes, review the
+#   preceding warmup, destroy, and OVStage constructor commits independently
+#   and DROP this commit.
+#   The benchmark-only helper is deliberately kept last so it is easy to leave
+#   behind. The material-device fix is already upstream in develop via #7212.
+#
+#   What it is: a kitless teleop dependency closure. It is identical to the
+#   supported `teleop` extra above minus `isaacsim`, `isaaclab-mimic`, and the
+#   isaacteleop `ui` and `cloudxr` feature sets, so that a headless benchmark
+#   can install teleop without pulling in the full Isaac Sim runtime. Use the
+#   supported `teleop` extra instead.
+# =============================================================================
+teleop-headless = [
+    "isaaclab-teleop",
+    "isaacteleop[retargeters]~=1.4.0 ; platform_system == 'Linux' and platform_machine == 'x86_64'",
+    "dex-retargeting==0.5.0 ; platform_system == 'Linux' and platform_machine == 'x86_64'",
+]
 rlinf = [
     "ray[default]>=2.47.0",
     "av>=12.3.0",
