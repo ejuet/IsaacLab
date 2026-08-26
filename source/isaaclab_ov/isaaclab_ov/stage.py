@@ -30,10 +30,10 @@ def create_ovstage(name: str) -> ovstage.Stage:
     process-scoped rather than per-stage: ovstage applies it when the first process reference is
     acquired and raises if a later stage asks for a conflicting model while another stage is live.
     Every Isaac Lab stage is therefore created through this helper so the whole process agrees on
-    one model.
+    one model. Builds that expose :class:`ovstage.StageConfig` request the CPU incremental model
+    explicitly. Earlier compatible builds accept only the stage name and use that same model as
+    their runtime default.
 
-    :attr:`~ovstage.HierarchyComputationModel.CPU_INCREMENTAL` is requested explicitly rather than
-    left implicit, so the model in force is visible at the call site.
     :attr:`~ovstage.HierarchyComputationModel.GPU_INCREMENTAL` is currently not working - objects
     are out-of-place.  Needs investigation
 
@@ -43,6 +43,9 @@ def create_ovstage(name: str) -> ovstage.Stage:
     Returns:
         The created :class:`ovstage.Stage`.
     """
+    if not hasattr(ovstage, "StageConfig"):
+        return ovstage.Stage(name)
+
     config = ovstage.StageConfig(
         runtime_default_hierarchy_computation_model=ovstage.HierarchyComputationModel.CPU_INCREMENTAL
     )
