@@ -405,6 +405,32 @@ def test_implicit_actuator_separate_rated_effort_limit_is_honored():
     torch.testing.assert_close(group.joint_effort_limit, torch.full((2, 3), 34.0))
 
 
+@pytest.mark.parametrize("control_type", [FakeActuatorControl, NativeFakeActuatorControl], ids=["lab", "native"])
+def test_soft_joint_velocity_limits_are_initialized_before_compute(control_type):
+    control = control_type()
+    control._current_joint_properties["joint_velocity_limit"].copy_(
+        torch.tensor([[10.0, 20.0, 30.0], [40.0, 50.0, 60.0]])
+    )
+
+    collection = ActuatorCollection(
+        {
+            "authored": ImplicitActuatorCfg(joint_names_expr=["joint_0", "joint_2"], stiffness=0.0, damping=0.0),
+            "configured": ImplicitActuatorCfg(
+                joint_names_expr=["joint_1"],
+                stiffness=0.0,
+                damping=0.0,
+                actuator_velocity_limit=7.0,
+            ),
+        },
+        control,
+    )
+
+    torch.testing.assert_close(
+        wp.to_torch(collection._soft_joint_vel_limits),
+        torch.tensor([[10.0, 7.0, 30.0], [40.0, 7.0, 60.0]]),
+    )
+
+
 @pytest.mark.parametrize(
     ("cfg", "actuator_type", "canonical_name"),
     [
