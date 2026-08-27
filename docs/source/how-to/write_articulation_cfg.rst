@@ -47,7 +47,7 @@ The last two parameters are optional. If not specified, they are kept at their d
 
 .. literalinclude:: ../../../source/isaaclab_assets/isaaclab_assets/robots/cartpole.py
    :language: python
-   :lines: 19-35
+   :lines: 17-34,49
    :dedent:
 
 To import articulation from a URDF file instead of a USD file, you can replace the
@@ -75,7 +75,7 @@ Meanwhile, the joint positions and velocities are set to 0.0.
 
 .. literalinclude:: ../../../source/isaaclab_assets/isaaclab_assets/robots/cartpole.py
    :language: python
-   :lines: 36-38
+   :lines: 17,35-37,49
    :dedent:
 
 Defining the actuator configuration
@@ -97,7 +97,7 @@ to combine them into a single actuator model.
 
    .. literalinclude:: ../../../source/isaaclab_assets/isaaclab_assets/robots/cartpole.py
       :language: python
-      :lines: 39-49
+      :lines: 17,38-49
       :dedent:
 
 
@@ -145,9 +145,9 @@ ownership model and runtime mutation paths.
       - Explicit actuator
     * - ``joint_effort_limit``
       - Writes the solver drive effort limit.
-      - Writes the solver effort limit; defaults high to avoid a second model clip.
+      - Writes the solver effort limit; retains the authored solver limit when unset.
     * - ``actuator_effort_limit``
-      - Not supported.
+      - Rated/model-facing telemetry limit; tracks the live solver effort limit when unset.
       - Clips actuator-model output.
     * - ``joint_velocity_limit``
       - Requests a solver velocity constraint.
