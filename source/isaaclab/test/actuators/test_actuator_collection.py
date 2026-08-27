@@ -27,6 +27,7 @@ from isaaclab.actuators import (
     IdealPDActuatorCfg,
     ImplicitActuator,
     ImplicitActuatorCfg,
+    RemotizedPDActuatorCfg,
 )
 from isaaclab.actuators.actuator_control import ArticulationActuatorControl
 from isaaclab.actuators.newton import read_group_parameter, write_group_parameter
@@ -77,6 +78,17 @@ def _dc_cfg(
         actuator_effort_limit=effort_limit,
         actuator_velocity_limit=velocity_limit,
         saturation_effort=saturation_effort,
+    )
+
+
+def _remotized_cfg(*, velocity_limit: float | None) -> RemotizedPDActuatorCfg:
+    """Create a minimal remotized PD actuator configuration."""
+    return RemotizedPDActuatorCfg(
+        joint_names_expr=[".*"],
+        stiffness=0.0,
+        damping=0.0,
+        actuator_velocity_limit=velocity_limit,
+        joint_parameter_lookup=[[-1.0, 1.0, 10.0], [1.0, 1.0, 10.0]],
     )
 
 
@@ -428,6 +440,22 @@ def test_soft_joint_velocity_limits_are_initialized_before_compute(control_type)
     torch.testing.assert_close(
         wp.to_torch(collection._soft_joint_vel_limits),
         torch.tensor([[10.0, 7.0, 30.0], [40.0, 7.0, 60.0]]),
+    )
+
+
+@pytest.mark.parametrize("control_type", [FakeActuatorControl, NativeFakeActuatorControl], ids=["lab", "native"])
+@pytest.mark.parametrize("velocity_limit", [None, 7.0], ids=["authored", "configured"])
+def test_remotized_soft_joint_velocity_limits_are_unbounded_before_compute(control_type, velocity_limit):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        collection = ActuatorCollection(
+            {"motor": _remotized_cfg(velocity_limit=velocity_limit)},
+            control_type(),
+        )
+
+    torch.testing.assert_close(
+        wp.to_torch(collection._soft_joint_vel_limits),
+        torch.full((2, 3), torch.inf),
     )
 
 
