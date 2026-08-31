@@ -22,9 +22,11 @@ import math
 import os
 import random
 import sys
+import threading
 import time
 from datetime import datetime
 from distutils.util import strtobool
+from pathlib import Path
 
 import gymnasium as gym
 from rl_games.common import env_configurations, vecenv
@@ -52,6 +54,35 @@ logger = logging.getLogger(__name__)
 # PLACEHOLDER: Extension template (do not remove this comment)
 with contextlib.suppress(ImportError):
     import isaaclab_tasks_experimental  # noqa: F401
+
+
+def _start_wandb_video_uploader(run_log_dir: str):
+    """Upload each completed Isaac Lab recording to the active W&B run."""
+    import wandb
+
+    stop_event = threading.Event()
+    uploaded_paths: set[Path] = set()
+    observed_sizes: dict[Path, int] = {}
+
+    def upload_pending(force: bool = False) -> None:
+        for video_path in sorted(Path(run_log_dir).rglob("*.mp4")):
+            if video_path in uploaded_paths:
+                continue
+            size = video_path.stat().st_size
+            # RecordVideo writes the file incrementally. Wait for its size to remain stable
+            # between polls before asking W&B to read it.
+            if force or observed_sizes.get(video_path) == size:
+                wandb.log({"training/video": wandb.Video(str(video_path), format="mp4")})
+                uploaded_paths.add(video_path)
+            observed_sizes[video_path] = size
+
+    def watch_videos() -> None:
+        while not stop_event.wait(5):
+            upload_pending()
+
+    uploader_thread = threading.Thread(target=watch_videos, name="wandb-video-uploader", daemon=True)
+    uploader_thread.start()
+    return stop_event, uploader_thread, upload_pending
 
 # -- argparse ----------------------------------------------------------------
 parser = argparse.ArgumentParser(description="Train an RL agent with RL-Games.")
@@ -232,6 +263,7 @@ def main():
         runner.reset()
 
         global_rank = int(os.getenv("RANK", "0"))
+        video_uploader = None
         if args_cli.track and global_rank == 0:
             if args_cli.wandb_entity is None:
                 raise ValueError("Weights and Biases entity must be specified for tracking.")
@@ -248,6 +280,8 @@ def main():
             if not wandb.run.resumed:
                 wandb.config.update({"env_cfg": env_cfg.to_dict()})
                 wandb.config.update({"agent_cfg": agent_cfg})
+            if args_cli.video:
+                video_uploader = _start_wandb_video_uploader(os.path.join(log_root_path, log_dir))
 
         try:
             if args_cli.checkpoint is not None:
@@ -259,6 +293,16 @@ def main():
             env.close()
         except KeyboardInterrupt:
             pass
+        finally:
+            if args_cli.track and global_rank == 0:
+                import wandb
+
+                if video_uploader is not None:
+                    stop_event, uploader_thread, upload_pending = video_uploader
+                    stop_event.set()
+                    uploader_thread.join()
+                    upload_pending(force=True)
+                wandb.finish()
 
 
 if __name__ == "__main__":
