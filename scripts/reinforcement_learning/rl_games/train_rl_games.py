@@ -39,6 +39,20 @@ with contextlib.suppress(ImportError):
     import isaaclab_tasks_experimental  # noqa: F401
 
 
+def _resolve_minibatch_size(num_envs: int, horizon_length: int, target_size: int) -> tuple[int, int]:
+    """Choose the largest valid minibatch no larger than the configured target."""
+    rollout_size = num_envs * horizon_length
+    if rollout_size <= 0:
+        raise ValueError(f"Rollout size must be positive, got {rollout_size}.")
+    if target_size <= 0:
+        raise ValueError(f"minibatch_size must be positive, got {target_size}.")
+
+    minibatch_size = min(target_size, rollout_size)
+    while rollout_size % minibatch_size != 0:
+        minibatch_size -= 1
+    return minibatch_size, rollout_size
+
+
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     """Parse RL-Games training arguments."""
     parser = argparse.ArgumentParser(description="Train an RL agent with RL-Games.")
@@ -121,6 +135,21 @@ def run(argv: list[str]) -> None:
             log_root_path = os.path.join(agent_cfg["pbt"]["directory"], log_root_path)
         else:
             log_root_path = os.path.abspath(log_root_path)
+
+        # Treat the YAML minibatch size as a target maximum. Resolve it after
+        # CLI environment overrides so either --num_envs or cfg.py changes use
+        # a valid divisor of the rollout size.
+        rl_config = agent_cfg["params"]["config"]
+        minibatch_size, rollout_size = _resolve_minibatch_size(
+            env_cfg.scene.num_envs,
+            rl_config["horizon_length"],
+            rl_config["minibatch_size"],
+        )
+        rl_config["minibatch_size"] = minibatch_size
+        print(
+            "[INFO] RL-Games minibatch size: "
+            f"{minibatch_size} (rollout size: {rollout_size}, num_envs: {env_cfg.scene.num_envs})"
+        )
 
         print(f"[INFO] Logging experiment in directory: {log_root_path}")
         log_dir = agent_cfg["params"]["config"].get(
